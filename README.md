@@ -151,7 +151,7 @@ S   T  |  |----------------|                                  |----------------|
 </pre>
 
 ## Test Environment:
-1. Tested on CentOS 7.3 (both nodes)
+1. CentOS 7.3 (both nodes)
 2. DRBD version 8.4
 3. gfs2-utils-3.1.9-3.el7.x86_64
 4. Pacemaker 1.1.15-11.el7_3.4
@@ -159,7 +159,7 @@ S   T  |  |----------------|                                  |----------------|
 
 
 ## Requirements & Assumptions
-1. yum install lvm2-cluster gfs2-utils.
+1. yum install lvm2-cluster gfs2-utils drbd84-utils kmod-drbd84.
 2. The 'install_gfs2_using_drbd.sh' is the master script to create GFS2 over DRBD.
    The script requires free disk space over which it will create DRBD partition.
 3. The script assumes a 2 node fencing enabled Pacemaker Cluster to be already present on
@@ -170,22 +170,26 @@ S   T  |  |----------------|                                  |----------------|
 
 
 ## Steps:
-1.  Start 2 node (serevr4/server7) Pacemaker cluster.
-2.  Configure DLM and CLVM into Pacemaker.
-3.  Start master script 'install_gfs2_using_drbd.sh' to initialize GFS2 and DRBD.
-4.  Verify DRBD is in dual-Primary mode then configure Pacemaker for DRBD.
-    Verify CLVM is configured properly by executing LVM commands: lvdispaly, pvdisplay and vgdisplay on both nodes.
-    Verify GFS2 is configured properly by checking mounted filesystem, execute commands: df -hT on both nodes.
-5.  Create KVM VM on serevr4 with virtual disks on GFS2 mount directory. Keep
-    pinging VM from a third node.
-6.  Perform Live Migration of VM from serevr4 to serevr7 once DRBD initial sync is
-    complete.
-7.  Since disks are already sync'd by DRBD so VM should be migrated quickly.
-    Verify ping is continously working.
-8.  Shutdown server4 and make sure VM on other node (server7) is workinf fine.
-9.  Start server4, start its Pacemaker Cluster and verify
-    DRBD is back in dual-Primary mode.
-10. Reverse migrate VM from server7 to server4. Ping must not break.
+-  Start 2 node Pacemaker cluster. Example:
+   server4(192.168.11.100), server7(192.168.11.200) with cluster name vCluster.
+-  Configure DLM and CLVM into Pacemaker.
+-  Start master script 'install_gfs2_using_drbd.sh' to initialize GFS2 and DRBD. Example:
+   install_gfs2_using_drbd.sh 192.168.11.100 192.168.11.200 vCluster
+-  Post install verify DRBD is in dual-Primary mode then configure Pacemaker for DRBD.
+   Verify CLVM by executing LVM commands: lvdispaly, pvdisplay and vgdisplay on both nodes.
+   Verify GFS2 by checking mounted filesystem, execute commands: df -hT on both nodes.
+-  Configure DRBD into master/slave resource in Pacemaker. Create 2 masters for DRBD
+   dual-Primary Configuration.
+-  Create KVM VM on server4 with virtual disks on GFS2 mount directory. Keep
+   pinging VM from a third node.
+-  Perform Live Migration of VM from server4 to server7 after DRBD initial sync is complete.
+-  Since disks are already sync'd by DRBD between server4 and server7 so VM should be
+   migrated quickly to server7. Verify ping is continously working during and after migration.
+-  Shutdown server4 and make sure VM on other server7 is working fine and does not hang.
+   On server7 also verify LVM and GFS2 are working.
+-  Start server4, start its Pacemaker Cluster, execute script 'resume_second_primary.sh'.
+-  On server4 Verify DRBD is back in dual-Primary mode. Verify LVM and GFS2.
+-  Reverse migrate VM from server7 to server4. Ping must not break and VM shoud not hang.
 
 
 ## Result:
