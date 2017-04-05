@@ -1,9 +1,10 @@
 # GFS2-DRBD-Cluster
 GFS2 Shared-Disk Cluster Filesystem over a Pacemaker 2 nodes cluster using DRBD
 
+
 ## Summary
 This collection of scripts aims to create Red Hat GFS2 Clustered Shared-disk Filesystem
-over a cluster of 2 nodes. DRBD is used for providing replicated read/write raw disk block access
+over a cluster of 2 nodes. DRBD is used for providing replicated read/write raw disk device
 over the nodes in a Pacemaker/Corosync Cluster. The cluster must have fencing enabled.
 
 
@@ -35,17 +36,17 @@ DRBD keeps shared virtual disks synchronized across cluster nodes by replicating
 block devices between them.
 
 DRBD thus can be used instead of SAN. By using GFS2 shared-disk filesystem on top of DRBD, it
-provides same filesystem abstraction as SAN. This approach of GFS2 over DRBD is used here to provide
-Shared Noting Live Migration of VM between 2 nodes of a Pacemaker Cluster, totally avoiding the need
-for any third storage box.
+provides same filesystem abstraction as SAN. This GFS2-DRBD-Cluster [Technology Stack](#technology-stack)
+is used here to provide Shared Noting Live Migration of VM between 2 nodes of a Pacemaker Cluster,
+totally avoiding the need for any third storage box.
 
 
 ## Pacemaker High Availability Cluster
 GFS2-over-DRBD cluster filesystem requires a working cluster to be already deployed over the nodes.
 Pacemaker/Corosync provide the HA Cluster framework to create the cluster between 2 nodes.
 
-http://clusterlabs.org/doc/en-US/Pacemaker/1.1/html-single/Clusters_from_Scratch
-http://clusterlabs.org/doc/en-US/Pacemaker/1.1/html-single/Pacemaker_Explained
+- http://clusterlabs.org/doc/en-US/Pacemaker/1.1/html-single/Clusters_from_Scratch
+- http://clusterlabs.org/doc/en-US/Pacemaker/1.1/html-single/Pacemaker_Explained
 
 
 ## GFS2
@@ -122,9 +123,9 @@ and its minor numbers are numbered from 0 onwards. A DRBD block device is named 
 is device minor number e.g. /dev/drbd0. The DRBD block device corresponds to a volume in a resource
 configured by DRBD.
 
-In the dual-Primary setup the DRBD virtual block device is setup over the raw disks of the two nodes: 
-"node1:/dev/sda6 + node2:/dev/sda6 -> both:/dev/drbd0". In this setup the /dev/drbd0 acts like a raw
-disk block over which the Clustered Logical Volume Manager (CLVM) is used to manage the shared storage.
+In the dual-Primary setup the DRBD virtual block device is setup over the raw disks of the two nodes:
+**node1:/dev/sdaX + node2:/dev/sdaY --> both:/dev/drbd0**. In this setup the /dev/drbd0 acts like a raw
+cluster block device over which Cluster Logical Volume Manager (CLVM) is used to manage the shared storage.
 
 http://docs.linbit.com/doc/users-guide-84/drbd-users-guide/
 
@@ -175,7 +176,7 @@ S   T  |  |----------------|                                  |----------------|
 -  Configure DLM and CLVM into Pacemaker.
 -  Start master script 'install_gfs2_using_drbd.sh' to initialize GFS2 and DRBD. Example:
    install_gfs2_using_drbd.sh 192.168.11.100 192.168.11.200 vCluster
--  Post install verify DRBD is in dual-Primary mode then configure Pacemaker for DRBD.
+-  Post install verify that DRBD is in dual-Primary mode.
    Verify CLVM by executing LVM commands: lvdispaly, pvdisplay and vgdisplay on both nodes.
    Verify GFS2 by checking mounted filesystem, execute commands: df -hT on both nodes.
 -  Configure DRBD into master/slave resource in Pacemaker. Create 2 masters for DRBD
@@ -187,9 +188,10 @@ S   T  |  |----------------|                                  |----------------|
    migrated quickly to server7. Verify ping is continously working during and after migration.
 -  Shutdown server4 and make sure VM on other server7 is working fine and does not hang.
    On server7 also verify LVM and GFS2 are working.
--  Start server4, start its Pacemaker Cluster, execute script 'resume_second_primary.sh'.
+-  Start server4, start its Pacemaker Cluster and execute script 'resume_second_primary.sh'.
 -  On server4 Verify DRBD is back in dual-Primary mode. Verify LVM and GFS2.
 -  Reverse migrate VM from server7 to server4. Ping must not break and VM shoud not hang.
+-  To completely undo the steps performed by this script bundle use 'uninstall_drbd.sh' script.
 
 
 ## Result:
