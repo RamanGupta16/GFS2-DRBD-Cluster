@@ -1,11 +1,11 @@
 #!/bin/sh
 #
 # This script creates a logical partition form the available free disk space.
-# After partition is created the initial 4GB of space is zeroed out so as to
+# After partition is created the initial 8GB of space is zeroed out so as to
 # destroy any previous filesystem data, journal, tables etc.
 #
 # This partition is intended to be used as DRBD backing device, though
-# can be used for aby other purpose.
+# can be used for any other purpose also.
 #
 
 # Exit script on error
@@ -27,6 +27,7 @@ fi
 # From the free disk partition create DRBD partition.
 start_free_space=`parted ${DISK} print free | grep "Free Space" | awk '{var=$1} END {print var}'`
 end_free_space=`parted ${DISK} print free | grep "Free Space" | awk '{var=$2} END {print var}'`
+
 parted -a optimal ${DISK} mkpart logical ${start_free_space} ${end_free_space} > /dev/null
 
 # Get the most recent partition created from Free Space

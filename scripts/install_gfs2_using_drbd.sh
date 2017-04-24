@@ -21,9 +21,9 @@
 # In effect this provides for Shared-Nothing Live Migration of VM.
 #
 #
-#        |----------------|                                  |----------------|  
+#        |----------------|                                  |----------------|
 #        |    VM          |   <------------------------>     |    VM          |
-#        |----------------|          Live Migration          |----------------|  
+#        |----------------|          Live Migration          |----------------|
 #        | KVM/QEMU       |   <------------------------>     | KVM/QEMU       |
 #  C  /\ |----------------|                                  |----------------|
 #  L  |  |  GFS2/DLM      |   <=== Cluster Aware FS ===>     |  GFS2/DLM      |
@@ -35,19 +35,25 @@
 #        | Disk Partition |                                  | Disk Partition |
 #        |----------------|                                  |----------------|
 #
+#
+# Script Bundle Structure:
+# ----------------------------
+# This script (install_gfs2_using_drbd.sh) is the master script which uses other
+# scripts to complete its job. Use only this script to create GFS2-over-DRBD
+# stack. See the requirements and assumptions in the README.md file before
+# proceeding with this script bundle.
+#
 # Notes:
+# ---------
 # ) RHEL suggests to Avoid SELinux on GFS2:
 #   https://access.redhat.com/documentation/en-US/Red_Hat_Enterprise_Linux/6/html/Global_File_System_2/s2-selinux-gfs2-gfs2.html
-# ) DRBD, GFS2, DLM and cLVM must be managed by Cluster Framework Pacemaker. This script does not do this integration.
+# ) DRBD, GFS2, DLM and cLVM must be managed by Cluster Framework Pacemaker. This script does not do Pacemaker integration.
 #
 #
 
 SCRIPT_NAME=$(basename $0)
 
-# Print the cmds executed
 #set -x
-
-# Exit script on error
 set -e
 
 # Root user

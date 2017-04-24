@@ -3,9 +3,8 @@
 # This script modifies /etc/lvm/lvm.conf so that it can be used
 # for Clustered LVM (cLVM) systems using DRBD dual-Primary mode for
 # Cluster Filesystem like GFS2. It does two things:
-# 
-# 1. Enable clustered locking for LVM.
 #
+# 1. Enable clustered locking for LVM and disallow fall-back to local locking
 # 2. Add filter in lvm.conf to let LVM filter only DRBD devices on both the cluster nodes
 #
 

@@ -23,7 +23,7 @@ DRBD_SYNC_PORT=7789
 cat > ${DRBD_GLOBAL_COMMON_CONF_FILE} <<EOF
 global
 {
-	usage-count no;
+  usage-count no;
 }
 
 common
@@ -45,7 +45,7 @@ common
   disk
   {
     fencing   resource-and-stonith;
-	}
+  }
 }
 EOF
 

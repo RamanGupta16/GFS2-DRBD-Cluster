@@ -1,10 +1,9 @@
 #!/bin/sh
 #
-# After a cluster node re-starts after going down then 
-# re-start the GFS2 resources 
+# After a cluster node re-starts execute this script to re-start
+# LV required for GFS2.
 #
 
-# Exit script on error
 set -e
 
 DRBD_VolGroup=Cluster_VG_DRBD
