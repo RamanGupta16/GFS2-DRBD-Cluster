@@ -1,5 +1,5 @@
 # GFS2-DRBD-Cluster
-GFS2 Shared-Disk Cluster Filesystem over a Pacemaker 2 nodes cluster using DRBD
+A GFS2 Shared-Disk Cluster Filesystem over a Pacemaker 2 nodes cluster using DRBD
 
 
 ## Summary
@@ -178,8 +178,8 @@ S   T  |  |----------------|                                  |----------------|
    This script internally calls several scripts and important among them is:
    *configure_gfs2_using_drbd.sh 192.168.11.100 192.168.11.200 vCluster*
 -  Post install verify that DRBD is in dual-Primary mode: *watch cat /proc/drbd*
-   Verify CLVM by executing LVM commands: *lvdispaly*, *pvdisplay* and *vgdisplay* on both nodes.
-   Verify GFS2 by checking mounted filesystem, execute commands: *df -hT* on both nodes.
+-  Verify CLVM by executing LVM commands: *lvdispaly*, *pvdisplay* and *vgdisplay* on both nodes.
+-  Verify GFS2 by checking mounted filesystem, execute commands: *df -hT* on both nodes.
 -  Create KVM VM on server4 with virtual disks on GFS2 mount directory. Keep
    pinging VM from a third node.
 -  Perform Live Migration of VM from server4 to server7 after DRBD initial sync is complete.
