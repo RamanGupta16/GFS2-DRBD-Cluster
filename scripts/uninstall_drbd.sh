@@ -1,6 +1,12 @@
 #!/bin/sh
 #
-# UNDO the DRBD configuration, LVM configuration and free the partition.
+# UNDO the GFS2-DRBD configuration on both nodes:
+#
+# 1) unmount the GFS2 mount point.
+# 2) LVM: Remove Logical Vol, Vol Group and Physical Vol.
+# 3) Stop DRBD. Obsolete the resource file and restore global common conf file.
+# 4) Restore original LVM configuration file.
+# 5) Free the DRBD partition.
 #
 
 SCRIPT_NAME=$(basename $0)
@@ -35,6 +41,7 @@ PEER_IP_ADDRESS=
 PEER_DISK=
 PEER_PARTITION=
 
+# Read IP Address, DRBD partition from DRBD_RESOURCE_FILE
 disk=
 partition=
 data_list=$(egrep ' disk.*;|address' ${DRBD_RESOURCE_FILE} | awk '{ print $2}' | cut -d':' -f1)
@@ -55,11 +62,11 @@ for item in ${data_list}; do
 done
 
 
-### Note:  Before uinstalling DRBD stop any apps using DRBD partition, close files on /backup etc.
-
-# GFS2 UUID
-#GFS2=$(tunegfs2 -l /dev/${DRBD_VolGroup}/${DRBD_LogicalVolume} | grep UUID | awk '{print $4}')
-GFS2=gfs2
+#Before uinstalling DRBD stop any apps using DRBD partition, close files on /backup etc.
+if lsof | grep ${DRBD_MOUNT_DIR} > /dev/null; then
+  echo "Before uinstalling DRBD stop any application(VM) on DRBD partition mounted ${DRBD_MOUNT_DIR}"
+  exit 1
+fi
 
 # Unmount the GFS2 mounted dir
 umount ${DRBD_MOUNT_DIR}
@@ -71,8 +78,8 @@ vgremove ${DRBD_VolGroup}
 pvremove /dev/${DRBD_BLOCK_DEVICE}
 
 # Stop DRBD
-ssh $(whoami)@${PEER_IP_ADDRESS} drbdadm down ${DRBD_RESOURCE_NAME}
 drbdadm down ${DRBD_RESOURCE_NAME}
+ssh $(whoami)@${PEER_IP_ADDRESS} drbdadm down ${DRBD_RESOURCE_NAME}
 
 systemctl stop drbd.service
 ssh $(whoami)@${PEER_IP_ADDRESS} systemctl stop drbd.service
@@ -85,19 +92,19 @@ ssh $(whoami)@${PEER_IP_ADDRESS} mv ${DRBD_RESOURCE_FILE} ${DRBD_RESOURCE_FILE}.
 mv ${DRBD_GLOBAL_COMMON_CONF_FILE}.backup ${DRBD_GLOBAL_COMMON_CONF_FILE}
 ssh $(whoami)@${PEER_IP_ADDRESS} mv ${DRBD_GLOBAL_COMMON_CONF_FILE}.backup ${DRBD_GLOBAL_COMMON_CONF_FILE}
 
-# Restore original LVM conf
-mv /etc/lvm/lvm.conf.backup /etc/lvm/lvm.conf
-ssh $(whoami)@${PEER_IP_ADDRESS} mv /etc/lvm/lvm.conf.backup /etc/lvm/lvm.conf
+# Restore orifinal default lvm.conf
+lvmconfig --type default --withcomments --withspaces --ignorelocal  > /etc/lvm/lvm.conf
+scp /etc/lvm/lvm.conf $(whoami)@${PEER_IP_ADDRESS}:/etc/lvm/lvm.conf
 
 # Delete the created partition and make it free again
-parted ${LOCAL_DISK} rm ${LOCAL_PARTITION}
-ssh $(whoami)@${PEER_IP_ADDRESS} parted ${PEER_DISK} rm ${PEER_PARTITION} # /dev/sda rm 6
+if [ -n "${LOCAL_DISK}" -a -n "${LOCAL_PARTITION}" ]; then
+  parted ${LOCAL_DISK} rm ${LOCAL_PARTITION}
+fi
 
-# Remove GFS2 entry filesystem table
-sed -i -e '/'${GFS2}'/d' /etc/fstab
-ssh $(whoami)@${PEER_IP_ADDRESS} sed -i -e '/'${GFS2}'/d' /etc/fstab
+if [ -n "${PEER_PARTITION}" -a -n "${PEER_DISK}" ]; then
+  ssh $(whoami)@${PEER_IP_ADDRESS} parted ${PEER_DISK} rm ${PEER_PARTITION}
+fi
 
-echo "DRBD uninstall"
-
-
+echo "GFS2-DRBD uninstall"
+logger "GFS2-DRBD uninstalled"
 

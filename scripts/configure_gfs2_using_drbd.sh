@@ -1,5 +1,6 @@
 #!/bin/sh
 #
+#
 # Configure the Clustered Shared-disk Filesystem GFS2 using DRBD for providing
 # raw disk block access over 2 nodes in a Cluster. GFS2 requires a working
 # Cluster to be already deployed on the nodes. Pacemaker/Corosync
@@ -21,9 +22,9 @@
 # In effect this provides for Shared-Nothing Live Migration of VM.
 #
 #
-#        |----------------|                                  |----------------|
+#        |----------------|                                  |----------------|  
 #        |    VM          |   <------------------------>     |    VM          |
-#        |----------------|          Live Migration          |----------------|
+#        |----------------|          Live Migration          |----------------|  
 #        | KVM/QEMU       |   <------------------------>     | KVM/QEMU       |
 #  C  /\ |----------------|                                  |----------------|
 #  L  |  |  GFS2/DLM      |   <=== Cluster Aware FS ===>     |  GFS2/DLM      |
@@ -35,25 +36,24 @@
 #        | Disk Partition |                                  | Disk Partition |
 #        |----------------|                                  |----------------|
 #
-#
-# Script Bundle Structure:
-# ----------------------------
-# This script (install_gfs2_using_drbd.sh) is the master script which uses other
-# scripts to complete its job. Use only this script to create GFS2-over-DRBD
-# stack. See the requirements and assumptions in the README.md file before
-# proceeding with this script bundle.
-#
 # Notes:
-# ---------
 # ) RHEL suggests to Avoid SELinux on GFS2:
 #   https://access.redhat.com/documentation/en-US/Red_Hat_Enterprise_Linux/6/html/Global_File_System_2/s2-selinux-gfs2-gfs2.html
-# ) DRBD, GFS2, DLM and cLVM must be managed by Cluster Framework Pacemaker. This script does not do Pacemaker integration.
+# ) DRBD, GFS2, DLM and cLVM must be managed by Cluster Framework Pacemaker. This script does not do this integration.
 #
+# Helper Scripts:
+# 1) format_free_partition.sh
+# 2) create_drbd_config.sh
+# 3) clvm_config.sh
+# 4) configure_filesystem.sh
 #
 
 SCRIPT_NAME=$(basename $0)
 
+# Print the cmds executed
 #set -x
+
+# Exit script on error
 set -e
 
 # Root user
@@ -101,12 +101,15 @@ DRBD_CONF_DIR=/etc/drbd.d
 DRBD_RESOURCE_FILE=${DRBD_CONF_DIR}/${DRBD_RESOURCE_NAME}.res
 DRBD_GLOBAL_COMMON_CONF_FILE=${DRBD_CONF_DIR}/global_common.conf
 
+DRBD_PARTITION_INFO=/etc/drbd_partition_info.conf
 DRBD_MOUNT_DIR=/backup
 
-alias echo='echo [$(uname -n)]  '
+alias echo='echo [$HOSTNAME] '
 
 validate_ip()
 {
+  echo ""
+
   ipcalc -c ${FIRST_PRIMARY_IP_ADDRESS}
   ipcalc -c ${SECOND_PRIMARY_IP_ADDRESS}
 
@@ -131,16 +134,22 @@ validate_ip()
     exit 1
   fi
 
+  echo "##################### Detect Nodes ############################"
+  echo "LocalNode ${LOCAL_IP_ADDRESS}   PeerNode ${PEER_IP_ADDRESS}"
   echo ""
-  echo "LocalNode ${LOCAL_IP_ADDRESS}   PeerNode ${PEER_IP_ADDRESS}" 
 }
+
 
 format_disk()
 {
+  echo "##################### Format Disks ############################"
+
   # Format Local Disk
   echo "Creating local DRBD partition ..."
   LOCAL_DRBD_DISK_PARTITION=`format_free_partition.sh | tr -d [:space:]`
   echo "Created local DRBD partition ${LOCAL_DRBD_DISK_PARTITION} ..."
+
+  [ -z "${LOCAL_DRBD_DISK_PARTITION}" ] && echo "Error: Local DRBD disk partition not found" && exit 1
 
   echo ""
 
@@ -148,14 +157,16 @@ format_disk()
   echo "Creating peer DRBD partition ..."
   PEER_DRBD_DISK_PARTITION=`ssh $(whoami)@${PEER_IP_ADDRESS} format_free_partition.sh | tr -d [:space:]`
   echo "Created peer DRBD partition ${PEER_DRBD_DISK_PARTITION} ..."
+
+  [ -z "${PEER_DRBD_DISK_PARTITION}" ] && echo "Error: Peer DRBD disk partition not found" && exit 1
+
+  echo ""
 }
+
 
 configure_drbd()
 {
-  #if [ -f ${DRBD_RESOURCE_FILE} ]; then
-  #  echo "DRBD already configured with resource file ${DRBD_RESOURCE_FILE} exiting..."
-  #  exit 1
-  #fi
+  echo "##################### Configure DRBD ############################"
 
   echo ""
   echo "Creating Primary-Primary (dual Primary) DRBD resource file ${DRBD_RESOURCE_FILE}"
@@ -186,18 +197,18 @@ configure_drbd()
   ssh $(whoami)@${PEER_IP_ADDRESS} drbdadm up ${DRBD_RESOURCE_NAME}
 
   # Start DRBD services
-  systemctl start drbd.service
+  #systemctl start drbd.service
   ssh $(whoami)@${PEER_IP_ADDRESS} systemctl start drbd.service
   
   # Promote DRBD resource to Primary. Local Primary DRBD node is the initial sync source
   drbdadm primary --force ${DRBD_RESOURCE_NAME}
   ssh $(whoami)@${PEER_IP_ADDRESS} drbdadm primary ${DRBD_RESOURCE_NAME}
 
-  echo "Success: Started DRBD on ${LOCAL_IP_ADDRESS} node. Use drbd-overview and /proc/drbd to monitor DRBD."
+  echo "Success: Started DRBD on ${LOCAL_IP_ADDRESS} node. Monitor DRBD using drbd-overview or cat /proc/drbd"
   echo "DRBD Node ${LOCAL_IP_ADDRESS} role: `drbdadm role ${DRBD_RESOURCE_NAME} | cut -f1 -d'/'`"
   echo "DRBD Node ${LOCAL_IP_ADDRESS} connection state: `drbdadm cstate ${DRBD_RESOURCE_NAME}`"
   echo ""
-  echo "Success: Started DRBD on ${PEER_IP_ADDRESS} node. Use drbd-overview and /proc/drbd to monitor DRBD. "
+  echo "Success: Started DRBD on ${PEER_IP_ADDRESS} node. Monitor DRBD using drbd-overview or cat /proc/drbd"
   echo "DRBD Node ${PEER_IP_ADDRESS} role: `ssh $(whoami)@${PEER_IP_ADDRESS} drbdadm role ${DRBD_RESOURCE_NAME} | cut -f1 -d'/'`"
   echo "DRBD Node ${PEER_IP_ADDRESS} connection state: `ssh $(whoami)@${PEER_IP_ADDRESS} drbdadm cstate ${DRBD_RESOURCE_NAME}`"
 
@@ -206,11 +217,14 @@ configure_drbd()
   echo ""
 }
 
+
 lvm_structure()
 {
+  echo "##################### Configure Cluster LVM ############################"
+
   # Edit /etc/lvm/lvm.conf on both nodes
-  clvm_config.sh
-  ssh $(whoami)@${PEER_IP_ADDRESS} clvm_config.sh 
+  clvm_config.sh ${LOCAL_DRBD_DISK_PARTITION}
+  ssh $(whoami)@${PEER_IP_ADDRESS} clvm_config.sh ${PEER_DRBD_DISK_PARTITION}
 
   ##### Create LVM structure over DRBD partition: Physical Vol, Vol Group, Logical Vol ####
 
@@ -225,27 +239,49 @@ lvm_structure()
   echo "Creating Clustered Logical Volume ${DRBD_LogicalVolume} over ${DRBD_VolGroup} of size ${DRBD_LV_SIZE}"
   lvcreate --size ${DRBD_LV_SIZE} --name ${DRBD_LogicalVolume} ${DRBD_VolGroup}
 
-  echo "Local Node Cluster LV :"
+  echo "Local Node Logical Volumes :"
   lvscan
   echo ""
 
-  echo "Peer Node Cluster LV :"
+  echo "Peer Node Cluster Logical Volumes :"
   ssh $(whoami)@${PEER_IP_ADDRESS} lvscan
   echo ""
 }
 
+
 configure_filesystem()
 {
+  echo "##################### Configure GFS2 ############################"
+
   # Format the clustered LV to use GFS2 Clustered filesystem
   mkfs.gfs2 -p lock_dlm -t ${CLUSTER_NAME}:vGFS2 -j 2 /dev/${DRBD_VolGroup}/${DRBD_LogicalVolume}
   echo "Creating GFS2 Cluster Filesystem over /dev/${DRBD_VolGroup}/${DRBD_LogicalVolume} ..."
 
   # Format the clustered LV to use GFS2 Clustered filesystem
-  configure_filesystem.sh ${DRBD_MOUNT_DIR} ${CLUSTER_NAME} ${DRBD_VolGroup} ${DRBD_LogicalVolume} ${DRBD_BLOCK_DEVICE}
-  ssh $(whoami)@${PEER_IP_ADDRESS} configure_filesystem.sh ${DRBD_MOUNT_DIR} ${CLUSTER_NAME} ${DRBD_VolGroup} ${DRBD_LogicalVolume}
+  configure_filesystem.sh ${DRBD_MOUNT_DIR} ${CLUSTER_NAME} \
+                          ${DRBD_VolGroup} ${DRBD_LogicalVolume} ${DRBD_BLOCK_DEVICE}
 
-  df -hT | grep gfs2
-  ssh $(whoami)@${PEER_IP_ADDRESS} df -hT | grep gfs2
+  ssh $(whoami)@${PEER_IP_ADDRESS} configure_filesystem.sh \
+                          ${DRBD_MOUNT_DIR} ${CLUSTER_NAME} \
+                          ${DRBD_VolGroup} ${DRBD_LogicalVolume}
+
+  echo ""
+}
+
+
+verify_gfs2_filesystem()
+{
+  echo "##################### Verify GFS2 ############################"
+
+  df -hT | grep gfs2 && \
+    echo "Success: GFS2 Filesystem Created at local node" || \
+    echo "Error: GFS2 Filesystem NOT created"
+
+  ssh $(whoami)@${PEER_IP_ADDRESS} df -hT | grep gfs2 && \
+     echo "Success: GFS2 Filesystem Created at peer node" || \
+     echo "Error: GFS2 Filesystem NOT created at peer node"
+
+  echo ""
 }
 
 #Validate IP Address
@@ -262,3 +298,7 @@ lvm_structure
 
 # Create Filesystem
 configure_filesystem
+
+# Verify Clustered Shared-disk Filesystem GFS2
+verify_gfs2_filesystem
+

@@ -2,14 +2,14 @@
 #
 # Mount the directory over GFS2
 #
-# Update /etc/fstab entry with GFS2 mount information.
-#
+# The /etc/fstab entry is not updated because Pacemaker will mount the directory
+# on Clustered LVM. So the the mount will not happen outside of Pacemaker.
 #
 
 # Exit script on error
 set -e
 
-alias echo='echo [$(uname -n)]  '
+alias echo='echo [$HOSTNAME] '
 
 DRBD_MOUNT_DIR=$1
 CLUSTER_NAME=$2
@@ -17,7 +17,7 @@ DRBD_VolGroup=$3
 DRBD_LogicalVolume=$4
 DRBD_BLOCK_DEVICE=$5
 
-echo "GFS2 details"
+echo "GFS2 Details"
 tunegfs2 -l /dev/${DRBD_VolGroup}/${DRBD_LogicalVolume}
 echo ""
 
@@ -34,11 +34,5 @@ else
   echo "Error: Could not mount /dev/${DRBD_BLOCK_DEVICE} on ${DRBD_MOUNT_DIR}"
 fi
 
-# Add entry in /etc/fstab on both nodes
-tunegfs2 -l /dev/${DRBD_VolGroup}/${DRBD_LogicalVolume} | grep UUID | awk '{print $4}' | sed -e 's/\(.*\)/UUID=\L\1\E\t\'${DRBD_MOUNT_DIR}'\tgfs2\tdefaults,noatime,nodiratime\t0 0/' >> /etc/fstab
-
-echo "Updated /etc/fstab with GFS2 filesystem mount information"
-
 exit 0
-
 

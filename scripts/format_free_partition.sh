@@ -1,11 +1,11 @@
 #!/bin/sh
 #
 # This script creates a logical partition form the available free disk space.
-# After partition is created the initial 8GB of space is zeroed out so as to
+# After partition is created the initial 16GB of space is zeroed out so as to
 # destroy any previous filesystem data, journal, tables etc.
 #
 # This partition is intended to be used as DRBD backing device, though
-# can be used for any other purpose also.
+# can be used for aby other purpose.
 #
 
 # Exit script on error
@@ -27,16 +27,15 @@ fi
 # From the free disk partition create DRBD partition.
 start_free_space=`parted ${DISK} print free | grep "Free Space" | awk '{var=$1} END {print var}'`
 end_free_space=`parted ${DISK} print free | grep "Free Space" | awk '{var=$2} END {print var}'`
-
-parted -a optimal ${DISK} mkpart logical ${start_free_space} ${end_free_space} > /dev/null
+parted -a optimal ${DISK} mkpart primary ${start_free_space} ${end_free_space} > /dev/null
 
 # Get the most recent partition created from Free Space
 DRBD_DISK_PARTITION_NUMBER=`fdisk -l ${DISK} | awk 'END { print substr($1,length($1)) }'`
 DRBD_DISK_PARTITION=${DISK}${DRBD_DISK_PARTITION_NUMBER}
-logger "Created DRBD partition(logical) ${DRBD_DISK_PARTITION} from ${start_free_space} to ${end_free_space}"
+logger "Created DRBD partition ${DRBD_DISK_PARTITION} from ${start_free_space} to ${end_free_space}"
 
 # Zero out the initial partition area
-/usr/bin/dd if=/dev/zero of=${DRBD_DISK_PARTITION} bs=8M count=1000
+/usr/bin/dd if=/dev/zero of=${DRBD_DISK_PARTITION} bs=16M count=1000
 
 partprobe
 
