@@ -1,0 +1,50 @@
+############## Pacemaker Cluster Status ###################################
+[root@server7 ~]# pcs status
+Cluster name: vCluster
+Stack: corosync
+Current DC: server4ha (version 1.1.15-11.el7_3.4-e174ec8) - partition with quorum
+Last updated: Tue May 23 17:01:46 2017          Last change: Mon May 22 22:13:08 2017 by root via cibadmin on server4ha
+
+2 nodes and 11 resources configured
+
+Online: [ server4ha server7ha ]
+
+Full list of resources:
+
+ vCluster-VirtualIP-10.168.10.199       (ocf::heartbeat:IPaddr2):       Started server4ha
+ vCluster-Stonith-server4ha     (stonith:fence_ipmilan):        Started server7ha
+ vCluster-Stonith-server7ha     (stonith:fence_ipmilan):        Started server4ha
+ Clone Set: dlm-clone [dlm]
+     Started: [ server4ha server7ha ]
+ Clone Set: clvmd-clone [clvmd]
+     Started: [ server4ha server7ha ]
+ Master/Slave Set: drbd_data_clone [drbd_data]
+     Masters: [ server4ha server7ha ]
+ Clone Set: Gfs2FS-clone [Gfs2FS]
+     Started: [ server4ha server7ha ]
+
+Daemon Status:
+  corosync: active/disabled
+  pacemaker: active/disabled
+  pcsd: active/enabled
+[root@server7 ~]#
+
+
+############## Pacemaker Cluster Constraints Status ###################################
+[root@server7 ~]#
+[root@server7 ~]# pcs constraint show
+Location Constraints:
+  Resource: vCluster-Stonith-server4ha
+    Disabled on: server4ha (score:-INFINITY)
+  Resource: vCluster-Stonith-server7ha
+    Disabled on: server7ha (score:-INFINITY)
+Ordering Constraints:
+  promote drbd_data_clone then start dlm-clone (kind:Mandatory)
+  start dlm-clone then start clvmd-clone (kind:Mandatory)
+  start clvmd-clone then start Gfs2FS-clone (kind:Mandatory)
+Colocation Constraints:
+  dlm-clone with drbd_data_clone (score:INFINITY)
+  clvmd-clone with dlm-clone (score:INFINITY)
+  Gfs2FS-clone with clvmd-clone (score:INFINITY)
+Ticket Constraints:
+[root@server7 ~]#
